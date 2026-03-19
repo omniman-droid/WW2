@@ -1,0 +1,9 @@
+{
+  "name": "operation-iron-wolf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Retro browser FPS with WW2 Allied vs Axis bunker theme",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

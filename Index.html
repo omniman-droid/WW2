@@ -1,33 +1,128 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>WW2 FPS</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Operation Iron Wolf: 1944</title>
 <style>
-body { margin:0; background:black; overflow:hidden; }
-#ui { position:absolute; top:10px; left:10px; color:white; }
+  :root {
+    --hud-green: #9eff7a;
+    --hud-red: #ff5f5f;
+    --hud-bg: rgba(0, 0, 0, 0.55);
+  }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #050505;
+    font-family: "Courier New", Courier, monospace;
+    color: #fff;
+  }
+
+  #game {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  #hud {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 14px;
+    pointer-events: none;
+    font-size: 15px;
+    text-shadow: 0 2px 0 #000;
+  }
+
+  .panel {
+    background: var(--hud-bg);
+    border: 2px solid #3b3b3b;
+    padding: 6px 10px;
+    min-width: 180px;
+  }
+
+  .hp { color: var(--hud-green); }
+  .danger { color: var(--hud-red); }
+
+  #centerMessage {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #575757;
+    padding: 14px 18px;
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.45;
+  }
+
+  #centerMessage.hidden { display: none; }
+
+  #shareBox {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #575757;
+    padding: 8px 10px;
+    font-size: 13px;
+    max-width: 360px;
+  }
+
+  #shareBox a {
+    color: #99d2ff;
+    word-break: break-all;
+  }
+
+  #copyJoinLink {
+    margin-top: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    background: #202020;
+    color: white;
+    border: 1px solid #4b4b4b;
+    padding: 3px 7px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
-
-<div id="ui">
-<button onclick="hostGame()">HOST</button>
-<button onclick="joinGame()">JOIN</button>
-<input id="peerId">
-<div id="info"></div>
-</div>
-
 <canvas id="game"></canvas>
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<div id="hud">
+  <div class="panel" id="hudLeft">HP: 100</div>
+  <div class="panel" id="hudCenter">Wave 1 | Axis 0</div>
+  <div class="panel" id="hudRight">Ammo 32/96</div>
+</div>
 
-<script src="maps/bunker1.js"></script>
-<script src="js/network.js"></script>
-<script src="js/player.js"></script>
-<script src="js/weapons.js"></script>
-<script src="js/render.js"></script>
-<script src="js/game.js"></script>
-<script src="js/main.js"></script>
+<div id="centerMessage">
+  <strong>OPERATION IRON WOLF: 1944</strong><br>
+  Allied ranger strike team breaching an Axis bunker complex.<br>
+  <br>
+  W/A/S/D move, Q strafe, E fire, Mouse aim / Left click fire, R reload.<br>
+  Press <strong>ENTER</strong> to deploy.
+</div>
 
+<div id="shareBox">
+  Share link:
+  <a id="joinLink" href="/" target="_blank" rel="noopener noreferrer">/</a>
+  <br>
+  <button id="copyJoinLink" type="button">Copy link</button>
+</div>
+
+<script src="Maps/Bunker1.js"></script>
+<script src="Player.js"></script>
+<script src="weapons.js"></script>
+<script src="Render.js"></script>
+<script src="Game.js"></script>
+<script src="Main.js"></script>
 </body>
 </html>
