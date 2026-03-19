@@ -1,42 +1,117 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const hudLeft = document.getElementById("hudLeft");
+const hudCenter = document.getElementById("hudCenter");
+const hudRight = document.getElementById("hudRight");
+const centerMessage = document.getElementById("centerMessage");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const TILE = 64;
 const FOV = Math.PI / 3;
+const MOVE_SPEED = 2.8;
+const ROT_SPEED = 2.2;
 
-let player = new Player(100, 100, "A");
+const keys = new Set();
+const mouse = { active: false, lastX: 0 };
 
-document.addEventListener("keydown", e => {
-    if (!player.alive) return;
+const player = new Player(SPAWN_POINT.x, SPAWN_POINT.y);
 
-    if (e.key === "a") player.angle -= 0.1;
-    if (e.key === "d") player.angle += 0.1;
-
-    let dx = Math.cos(player.angle) * 3;
-    let dy = Math.sin(player.angle) * 3;
-
-    if (e.key === "w") player.move(dx, dy);
-    if (e.key === "s") player.move(-dx, -dy);
-
-    if (e.key === " ") player.weapon.shoot(player, others);
-});
-
-function loop() {
-    requestAnimationFrame(loop);
-
-    ctx.fillStyle = "black";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    drawPlayers(player);
-
-    if (conn && conn.open) {
-        conn.send(player);
-    }
-
-    checkRoundEnd(player);
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 
-loop();
+window.addEventListener("resize", resize);
+resize();
+
+window.addEventListener("keydown", (e) => {
+  keys.add(e.key.toLowerCase());
+
+  if (e.key === "Enter" && GAME.state === "intro") {
+    GAME.state = "playing";
+    centerMessage.classList.add("hidden");
+    startWave(1);
+  }
+
+  if (e.key.toLowerCase() === "r") {
+    player.weapon.startReload();
+  }
+
+  if (e.key === "Enter" && GAME.state === "dead") {
+    player.reset();
+    GAME.kills = 0;
+    GAME.state = "playing";
+    centerMessage.classList.add("hidden");
+    startWave(1);
+  }
+});
+
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+canvas.addEventListener("mousedown", () => {
+  mouse.active = true;
+  canvas.requestPointerLock?.();
+});
+
+window.addEventListener("mouseup", () => {
+  mouse.active = false;
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (document.pointerLockElement === canvas) {
+    player.angle += e.movementX * 0.002;
+  }
+});
+
+function update(dt) {
+  if (GAME.state !== "playing") return;
+
+  const move = MOVE_SPEED * dt;
+  const rot = ROT_SPEED * dt;
+
+  if (keys.has("arrowleft")) player.angle -= rot;
+  if (keys.has("arrowright")) player.angle += rot;
+
+  const forwardX = Math.cos(player.angle);
+  const forwardY = Math.sin(player.angle);
+  const sideX = Math.cos(player.angle + Math.PI / 2);
+  const sideY = Math.sin(player.angle + Math.PI / 2);
+
+  if (keys.has("w")) player.move(forwardX * move, forwardY * move);
+  if (keys.has("s")) player.move(-forwardX * move, -forwardY * move);
+  if (keys.has("q") || keys.has("a")) player.move(-sideX * move, -sideY * move);
+  if (keys.has("e") || keys.has("d")) player.move(sideX * move, sideY * move);
+
+  if (mouse.active || keys.has(" ")) {
+    player.weapon.shoot(player, GAME.enemies);
+  }
+
+  updateGame(player);
+}
+
+function updateHud() {
+  hudLeft.innerHTML = `HP: <span class="${player.hp < 30 ? "danger" : "hp"}">${player.hp}</span> | Kills ${GAME.kills}`;
+  hudRight.textContent = player.weapon.reloading
+    ? "Reloading..."
+    : `Ammo ${player.weapon.ammo}/${player.weapon.reserve}`;
+
+  const alive = GAME.enemies.filter(e => e.alive).length;
+  hudCenter.textContent = `Wave ${GAME.wave} | Axis ${alive}`;
+
+  if (GAME.state === "dead") {
+    centerMessage.classList.remove("hidden");
+    centerMessage.innerHTML = `<strong>MISSION FAILED</strong><br>${FACTIONS.allied} repelled after wave ${GAME.wave}. Axis units eliminated: ${GAME.kills}.<br><br>Press <strong>ENTER</strong> to redeploy.`;
+  }
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.035, (now - last) / 1000);
+  last = now;
+
+  update(dt);
+  drawWorld(player, canvas, ctx, FOV);
+  updateHud();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
