@@ -1,37 +1,43 @@
 class Player {
-    constructor(x, y, team) {
-        this.x = x;
-        this.y = y;
-        this.angle = 0;
-        this.team = team;
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.angle = -Math.PI / 2;
+    this.hp = 100;
+    this.alive = true;
+    this.radius = 0.22;
+    this.weapon = new SMG();
+    this.hitFlashUntil = 0;
+  }
 
-        this.hp = 100;
-        this.alive = true;
-        this.hasFlag = false;
+  move(dx, dy) {
+    const nx = this.x + dx;
+    const ny = this.y + dy;
 
-        this.weapon = new Rifle();
+    if (!isWall(nx, this.y, this.radius)) {
+      this.x = nx;
     }
 
-    move(dx, dy) {
-        let nx = this.x + dx;
-        let ny = this.y + dy;
-
-        let mx = Math.floor(nx / TILE);
-        let my = Math.floor(ny / TILE);
-
-        if (MAP[my][mx] !== "#") {
-            this.x = nx;
-            this.y = ny;
-        }
+    if (!isWall(this.x, ny, this.radius)) {
+      this.y = ny;
     }
+  }
 
-    takeDamage(dmg, isHeadshot) {
-        if (isHeadshot) dmg *= 2;
-
-        this.hp -= dmg;
-
-        if (this.hp <= 0) {
-            this.alive = false;
-        }
+  takeDamage(amount) {
+    if (!this.alive) return;
+    this.hp = Math.max(0, this.hp - amount);
+    this.hitFlashUntil = performance.now() + 130;
+    if (this.hp <= 0) {
+      this.alive = false;
     }
+  }
+
+  reset() {
+    this.x = SPAWN_POINT.x;
+    this.y = SPAWN_POINT.y;
+    this.angle = -Math.PI / 2;
+    this.hp = 100;
+    this.alive = true;
+    this.weapon.reset();
+  }
 }
