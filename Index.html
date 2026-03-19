@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WW2 Retro FPS</title>
+<style>
+body { margin:0; background:black; color:white; font-family:monospace; overflow:hidden;}
+#ui { position:absolute; top:10px; left:10px; z-index:2;}
+</style>
+</head>
+<body>
+
+<div id="ui">
+<button onclick="hostGame()">HOST</button>
+<button onclick="joinGame()">JOIN</button>
+<input id="peerId" placeholder="host id">
+<div id="info"></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const TILE = 64;
+
+const MAP = [
+"###########",
+"#A   #   N#",
+"# ## # ## #",
+"#    #    #",
+"#### ### ##",
+"#    #    #",
+"# ## # ## #",
+"#   #     #",
+"#N  ###   #",
+"###########"
+];
+
+let player = {
+    x: 100,
+    y: 100,
+    angle: 0,
+    alive: true,
+    team: "A",
+    hasFlag: false
+};
+
+let others = {};
+
+let flags = {
+    A: {x: TILE*1.5, y: TILE*1.5},
+    N: {x: TILE*8.5, y: TILE*8.5}
+};
+
+let peer, conn;
+
+const FOV = Math.PI/3;
+const NUM_RAYS = 120;
+const DEPTH = 800;
+
+// --- NETWORK ---
+function hostGame() {
+    peer = new Peer();
+    peer.on('open', id => {
+        document.getElementById("info").innerText = "HOST ID: " + id;
+    });
+
+    peer.on('connection', connection => {
+        conn = connection;
+        setupConnection();
+    });
+}
+
+function joinGame() {
+    const id = document.getElementById("peerId").value;
+    peer = new Peer();
+
+    peer.on('open', () => {
+        conn = peer.connect(id);
+        setupConnection();
+    });
+}
+
+function setupConnection() {
+    conn.on('data', data => {
+        others = data;
+    });
+}
+
+// --- INPUT ---
+document.addEventListener("keydown", e => {
+    if (!player.alive) return;
+
+    if (e.key === "a") player.angle -= 0.1;
+    if (e.key === "d") player.angle += 0.1;
+
+    let dx = Math.cos(player.angle) * 3;
+    let dy = Math.sin(player.angle) * 3;
+
+    if (e.key === "w") move(dx, dy);
+    if (e.key === "s") move(-dx, -dy);
+
+    if (e.key === " ") shoot();
+});
+
+// --- MOVE ---
+function move(dx, dy) {
+    let nx = player.x + dx;
+    let ny = player.y + dy;
+
+    let mx = Math.floor(nx / TILE);
+    let my = Math.floor(ny / TILE);
+
+    if (MAP[my][mx] !== "#") {
+        player.x = nx;
+        player.y = ny;
+    }
+
+    checkFlag();
+}
+
+// --- SHOOT ---
+function shoot() {
+    for (let id in others) {
+        let p = others[id].self;
+
+        let dx = p.x - player.x;
+        let dy = p.y - player.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        let angleTo = Math.atan2(dy, dx);
+        let diff = Math.abs(angleTo - player.angle);
+
+        if (diff < 0.2 && dist < 300) {
+            others[id].self.alive = false;
+        }
+    }
+}
+
+// --- FLAG ---
+function checkFlag() {
+    let enemy = player.team === "A" ? "N" : "A";
+
+    let f = flags[enemy];
+
+    let dx = f.x - player.x;
+    let dy = f.y - player.y;
+
+    if (Math.sqrt(dx*dx + dy*dy) < 30) {
+        player.hasFlag = true;
+    }
+
+    let home = flags[player.team];
+
+    if (player.hasFlag) {
+        let hx = home.x - player.x;
+        let hy = home.y - player.y;
+
+        if (Math.sqrt(hx*hx + hy*hy) < 30) {
+            alert("YOU WIN ROUND");
+            resetRound();
+        }
+    }
+}
+
+// --- RESET ---
+function resetRound() {
+    player.alive = true;
+    player.hasFlag = false;
+    player.x = 100;
+    player.y = 100;
+
+    for (let id in others) {
+        others[id].self.alive = true;
+    }
+}
+
+// --- RAYCAST ---
+function raycast() {
+    let rays = [];
+
+    for (let i = 0; i < NUM_RAYS; i++) {
+        let angle = player.angle - FOV/2 + (i/NUM_RAYS)*FOV;
+
+        for (let d = 0; d < DEPTH; d++) {
+            let x = player.x + Math.cos(angle)*d;
+            let y = player.y + Math.sin(angle)*d;
+
+            let mx = Math.floor(x/TILE);
+            let my = Math.floor(y/TILE);
+
+            if (MAP[my][mx] === "#") {
+                rays.push({dist:d, ray:i});
+                break;
+            }
+        }
+    }
+
+    return rays;
+}
+
+// --- DRAW ---
+function draw() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    let rays = raycast();
+    let colWidth = canvas.width / NUM_RAYS;
+
+    rays.forEach(r => {
+        let h = 5000/(r.dist+1);
+        let shade = 255 - r.dist*0.5;
+
+        ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+
+        ctx.fillRect(r.ray*colWidth, canvas.height/2 - h/2, colWidth, h);
+    });
+
+    // flags
+    ctx.fillStyle = "blue";
+    ctx.fillRect(50,50,10,10);
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(canvas.width-60,50,10,10);
+
+    // players
+    for (let id in others) {
+        let p = others[id].self;
+        if (!p.alive) continue;
+
+        let dx = p.x - player.x;
+        let dy = p.y - player.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        let angle = Math.atan2(dy, dx) - player.angle;
+
+        let size = 5000 / dist;
+        let x = (angle / FOV) * canvas.width + canvas.width/2;
+
+        ctx.fillStyle = p.team === "A" ? "blue" : "red";
+        ctx.fillRect(x, canvas.height/2 - size/2, size/2, size);
+    }
+
+    // HUD
+    ctx.fillStyle = "white";
+    ctx.fillText(player.alive ? "ALIVE" : "DEAD", 20, canvas.height-40);
+    ctx.fillText(player.hasFlag ? "FLAG" : "", 20, canvas.height-20);
+}
+
+// --- LOOP ---
+function loop() {
+    requestAnimationFrame(loop);
+
+    if (conn && conn.open) {
+        conn.send({
+            self: player
+        });
+    }
+
+    draw();
+}
+
+loop();
+</script>
+</body>
+</html>
